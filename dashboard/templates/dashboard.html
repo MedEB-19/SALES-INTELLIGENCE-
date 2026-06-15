@@ -1,0 +1,787 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coca-Cola — Sales Intelligence Platform</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap');
+  :root {
+    --red:       #E8002D;
+    --red-dark:  #B0001F;
+    --red-glow:  rgba(232,0,45,0.18);
+    --bg:        #0A0A0A;
+    --bg2:       #111111;
+    --bg3:       #181818;
+    --border:    rgba(255,255,255,0.07);
+    --text:      #F0EDE8;
+    --muted:     #6B6560;
+    --accent:    #F5C518;
+    --green:     #2ECC71;
+    --card-shadow: 0 4px 32px rgba(0,0,0,0.6);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  /* ── NOISE TEXTURE OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 0;
+  }
+  /* ── TOPBAR ── */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,10,10,0.92);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 32px; height: 64px;
+    gap: 24px;
+  }
+  .logo-area {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .logo-bubble {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--red);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 15px; color: #fff; letter-spacing: 1px;
+    box-shadow: 0 0 18px var(--red-glow);
+  }
+  .logo-text {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px; letter-spacing: 3px;
+    color: var(--text);
+  }
+  .logo-text span { color: var(--red); }
+  .nav-pills {
+    display: flex; gap: 4px; margin-left: auto;
+  }
+  .nav-pill {
+    padding: 6px 16px; border-radius: 20px;
+    font-size: 12px; font-weight: 600; letter-spacing: 1px;
+    cursor: pointer; border: none; background: transparent;
+    color: var(--muted); transition: all .2s;
+  }
+  .nav-pill:hover, .nav-pill.active {
+    background: var(--red); color: #fff;
+    box-shadow: 0 0 16px var(--red-glow);
+  }
+  .live-badge {
+    display: flex; align-items: center; gap: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; color: var(--green);
+    border: 1px solid rgba(46,204,113,0.3);
+    padding: 4px 10px; border-radius: 20px;
+  }
+  .live-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    animation: pulse-green 2s infinite;
+  }
+  @keyframes pulse-green {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(46,204,113,0.4); }
+    50% { opacity: 0.7; box-shadow: 0 0 0 6px rgba(46,204,113,0); }
+  }
+  /* ── MAIN LAYOUT ── */
+  main {
+    position: relative; z-index: 1;
+    padding: 32px;
+    max-width: 1600px; margin: 0 auto;
+  }
+  /* ── HERO STRIP ── */
+  .hero {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 32px;
+  }
+  .hero-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(42px, 5vw, 72px);
+    letter-spacing: 4px; line-height: 1;
+  }
+  .hero-title span { color: var(--red); }
+  .hero-subtitle {
+    font-size: 13px; color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    letter-spacing: 2px; margin-top: 6px;
+  }
+  .last-update {
+    text-align: right;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; color: var(--muted);
+  }
+  .last-update strong { display: block; font-size: 18px; color: var(--text); font-family: 'Bebas Neue', sans-serif; letter-spacing: 2px; }
+  /* ── KPI ROW ── */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px; margin-bottom: 28px;
+  }
+  .kpi-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 20px;
+    position: relative; overflow: hidden;
+    transition: transform .2s, border-color .2s;
+  }
+  .kpi-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(232,0,45,0.3);
+  }
+  .kpi-card::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+    background: var(--red);
+  }
+  .kpi-card.green::before { background: var(--green); }
+  .kpi-card.gold::before  { background: var(--accent); }
+  .kpi-card.blue::before  { background: #4FA3FF; }
+  .kpi-label {
+    font-size: 11px; letter-spacing: 2px;
+    color: var(--muted); text-transform: uppercase; margin-bottom: 10px;
+  }
+  .kpi-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 38px; letter-spacing: 2px; line-height: 1;
+    color: var(--text);
+  }
+  .kpi-unit {
+    font-size: 16px; color: var(--muted); margin-left: 4px;
+  }
+  .kpi-sub {
+    font-size: 11px; color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    margin-top: 8px;
+  }
+  /* ── GRID LAYOUTS ── */
+  .grid-2 {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 20px; margin-bottom: 20px;
+  }
+  .grid-3 {
+    display: grid; grid-template-columns: 2fr 1fr 1fr;
+    gap: 20px; margin-bottom: 20px;
+  }
+  .grid-full { margin-bottom: 20px; }
+  /* ── CHART CARD ── */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: var(--card-shadow);
+  }
+  .card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .card-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px; letter-spacing: 2px; color: var(--text);
+  }
+  .card-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; padding: 3px 10px;
+    border-radius: 20px; letter-spacing: 1px;
+  }
+  .badge-red   { background: var(--red-glow); color: var(--red); border: 1px solid rgba(232,0,45,0.3); }
+  .badge-green { background: rgba(46,204,113,0.1); color: var(--green); border: 1px solid rgba(46,204,113,0.3); }
+  .badge-gold  { background: rgba(245,197,24,0.1); color: var(--accent); border: 1px solid rgba(245,197,24,0.3); }
+  .chart-wrap {
+    position: relative;
+    height: 280px;
+  }
+  .chart-wrap.tall { height: 340px; }
+  .chart-wrap.short { height: 220px; }
+  /* ── TABLE ── */
+  .data-table {
+    width: 100%; border-collapse: collapse;
+    font-size: 13px;
+  }
+  .data-table th {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--muted); padding: 10px 12px; text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .data-table td {
+    padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.03);
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+  }
+  .data-table tr:hover td { background: rgba(255,255,255,0.03); }
+  .pill-passed { background: rgba(46,204,113,0.15); color: var(--green); padding: 2px 8px; border-radius: 10px; font-size: 10px; }
+  .pill-blocked { background: rgba(232,0,45,0.15); color: var(--red); padding: 2px 8px; border-radius: 10px; font-size: 10px; }
+  /* ── REGION BAR ── */
+  .region-bars { display: flex; flex-direction: column; gap: 12px; }
+  .region-item {}
+  .region-meta { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px; }
+  .region-name { font-weight: 600; }
+  .region-val  { font-family: 'IBM Plex Mono', monospace; color: var(--muted); font-size: 11px; }
+  .region-bar-track { height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+  .region-bar-fill  { height: 100%; border-radius: 3px; background: var(--red); transition: width 1s ease; }
+  .region-bar-fill.green { background: var(--green); }
+  .region-bar-fill.gold  { background: var(--accent); }
+  .region-bar-fill.blue  { background: #4FA3FF; }
+  /* ── FORECAST TABLE ── */
+  .forecast-grid {
+    display: grid; gap: 10px;
+  }
+  .forecast-row {
+    display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr;
+    align-items: center; padding: 12px 16px;
+    background: var(--bg3); border-radius: 8px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+    border: 1px solid var(--border);
+  }
+  .forecast-row.header {
+    font-size: 10px; letter-spacing: 1.5px; color: var(--muted);
+    background: transparent; text-transform: uppercase;
+  }
+  .fc-val { color: var(--green); font-weight: 600; }
+  /* ── PIPELINE STATUS ── */
+  .pipeline {
+    display: flex; align-items: center; gap: 0;
+    padding: 16px 0;
+  }
+  .pipe-step {
+    flex: 1; text-align: center;
+    position: relative;
+  }
+  .pipe-step + .pipe-step::before {
+    content: '';
+    position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+    width: 100%; height: 2px;
+    background: linear-gradient(90deg, var(--red), transparent);
+    z-index: 0;
+  }
+  .pipe-icon {
+    width: 44px; height: 44px; border-radius: 50%;
+    margin: 0 auto 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; position: relative; z-index: 1;
+    border: 2px solid var(--red);
+    background: var(--bg2);
+    box-shadow: 0 0 20px var(--red-glow);
+  }
+  .pipe-icon.ok { border-color: var(--green); box-shadow: 0 0 20px rgba(46,204,113,0.2); }
+  .pipe-label { font-size: 10px; color: var(--muted); letter-spacing: 1px; font-family: 'IBM Plex Mono', monospace; }
+  .pipe-status { font-size: 9px; margin-top: 2px; color: var(--green); font-family: 'IBM Plex Mono', monospace; }
+  /* ── LOADING ── */
+  .loading {
+    display: flex; align-items: center; justify-content: center;
+    height: 100%; color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+    gap: 8px;
+  }
+  .spin {
+    width: 14px; height: 14px; border: 2px solid var(--border);
+    border-top-color: var(--red); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* ── FOOTER ── */
+  footer {
+    text-align: center; padding: 32px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; color: var(--muted);
+    border-top: 1px solid var(--border);
+    margin-top: 20px;
+  }
+  /* ── SCROLL ANIMATION ── */
+  .fade-in {
+    opacity: 0; transform: translateY(20px);
+    animation: fadeUp .5s ease forwards;
+  }
+  @keyframes fadeUp {
+    to { opacity:1; transform:translateY(0); }
+  }
+  @media (max-width: 1100px) {
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .grid-2  { grid-template-columns: 1fr; }
+    .grid-3  { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<!-- ── HEADER ── -->
+<header>
+  <div class="logo-area">
+    <div class="logo-bubble">CC</div>
+    <div class="logo-text">COCA<span>·</span>COLA</div>
+  </div>
+  <nav class="nav-pills">
+    <button class="nav-pill active">Overview</button>
+    <button class="nav-pill">Régions</button>
+    <button class="nav-pill">ML / Prévisions</button>
+    <button class="nav-pill">Qualité</button>
+  </nav>
+  <div class="live-badge">
+    <div class="live-dot"></div>
+    LIVE DATA
+  </div>
+</header>
+<!-- ── MAIN ── -->
+<main>
+  <!-- Hero -->
+  <div class="hero fade-in">
+    <div>
+      <div class="hero-title">SALES<br><span>INTELLIGENCE</span></div>
+      <div class="hero-subtitle">DATA PLATFORM · END-TO-END ANALYTICS</div>
+    </div>
+    <div class="last-update">
+      <strong id="clock">--:--:--</strong>
+      <span id="date-display">-- --- ----</span>
+    </div>
+  </div>
+  <!-- Pipeline Status -->
+  <div class="card grid-full fade-in" style="animation-delay:.1s; margin-bottom:20px;">
+    <div class="card-header">
+      <div class="card-title">PIPELINE STATUS</div>
+      <div class="card-badge badge-green">OPÉRATIONNEL</div>
+    </div>
+    <div class="pipeline">
+      <div class="pipe-step">
+        <div class="pipe-icon ok">📥</div>
+        <div class="pipe-label">SOURCES</div>
+        <div class="pipe-status">ACTIVE</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-icon ok">⚡</div>
+        <div class="pipe-label">KAFKA</div>
+        <div class="pipe-status">STREAMING</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-icon ok">🔍</div>
+        <div class="pipe-label">QUALITÉ</div>
+        <div class="pipe-status">DQ ≥ 80</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-icon ok">⚙️</div>
+        <div class="pipe-label">SPARK</div>
+        <div class="pipe-status">PROCESSING</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-icon ok">🗄️</div>
+        <div class="pipe-label">DWH</div>
+        <div class="pipe-status">POSTGRES</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-icon ok">🤖</div>
+        <div class="pipe-label">ML / IA</div>
+        <div class="pipe-status">RF + KMEANS</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-icon ok">📊</div>
+        <div class="pipe-label">DASHBOARD</div>
+        <div class="pipe-status">LIVE</div>
+      </div>
+    </div>
+  </div>
+  <!-- KPI Row -->
+  <div class="kpi-row fade-in" style="animation-delay:.15s;">
+    <div class="kpi-card">
+      <div class="kpi-label">Chiffre d'Affaires Total</div>
+      <div class="kpi-value"><span id="kpi-ca">—</span><span class="kpi-unit">$</span></div>
+      <div class="kpi-sub" id="kpi-period">Chargement...</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">Profit Opérationnel</div>
+      <div class="kpi-value"><span id="kpi-profit">—</span><span class="kpi-unit">$</span></div>
+      <div class="kpi-sub">Marge moy. <span id="kpi-marge">—</span>%</div>
+    </div>
+    <div class="kpi-card gold">
+      <div class="kpi-label">Transactions</div>
+      <div class="kpi-value" id="kpi-tx">—</div>
+      <div class="kpi-sub">Enregistrements validés</div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">DQ Score Moyen</div>
+      <div class="kpi-value"><span id="kpi-dq">—</span><span class="kpi-unit">/100</span></div>
+      <div class="kpi-sub">Seuil de blocage : 80</div>
+    </div>
+  </div>
+  <!-- Row 1 : Évolution + Régions -->
+  <div class="grid-2 fade-in" style="animation-delay:.2s;">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">ÉVOLUTION MENSUELLE DES VENTES</div>
+        <div class="card-badge badge-red">PAR RÉGION</div>
+      </div>
+      <div class="chart-wrap tall">
+        <div class="loading" id="loading-evo"><div class="spin"></div>Chargement...</div>
+        <canvas id="chart-evo" style="display:none;"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">RÉPARTITION PAR RÉGION</div>
+        <div class="card-badge badge-gold">CA TOTAL</div>
+      </div>
+      <div class="chart-wrap tall">
+        <div class="loading" id="loading-donut"><div class="spin"></div>Chargement...</div>
+        <canvas id="chart-donut" style="display:none;"></canvas>
+      </div>
+    </div>
+  </div>
+  <!-- Row 2 : Barres région + Top produits + Marge -->
+  <div class="grid-3 fade-in" style="animation-delay:.25s;">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">TOP PRODUITS</div>
+        <div class="card-badge badge-red">CA</div>
+      </div>
+      <div class="chart-wrap">
+        <div class="loading" id="loading-produits"><div class="spin"></div>Chargement...</div>
+        <canvas id="chart-produits" style="display:none;"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">CA PAR RÉGION</div>
+        <div class="card-badge badge-green">RANKING</div>
+      </div>
+      <div id="region-bars" class="region-bars" style="margin-top:4px;">
+        <div class="loading"><div class="spin"></div>Chargement...</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">MARGE PAR RÉGION</div>
+        <div class="card-badge badge-gold">%</div>
+      </div>
+      <div class="chart-wrap short">
+        <div class="loading" id="loading-marge"><div class="spin"></div>Chargement...</div>
+        <canvas id="chart-marge" style="display:none;"></canvas>
+      </div>
+    </div>
+  </div>
+  <!-- Row 3 : ML Forecasts + DQ Log -->
+  <div class="grid-2 fade-in" style="animation-delay:.3s;">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">PRÉVISIONS ML — RANDOM FOREST</div>
+        <div class="card-badge badge-green">3 MOIS</div>
+      </div>
+      <div id="forecast-container">
+        <div class="loading"><div class="spin"></div>Chargement modèle...</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">JOURNAL QUALITÉ DONNÉES</div>
+        <div class="card-badge badge-red">DQ LOG</div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="data-table" id="dq-table">
+          <thead>
+            <tr>
+              <th>Batch ID</th>
+              <th>Horodatage</th>
+              <th>Score</th>
+              <th>Lignes</th>
+              <th>Statut</th>
+            </tr>
+          </thead>
+          <tbody id="dq-body">
+            <tr><td colspan="5" style="text-align:center; color:var(--muted);">Chargement...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+<footer>
+  Coca-Cola Data Intelligence Platform &nbsp;·&nbsp; Pipeline End-to-End &nbsp;·&nbsp;
+  PostgreSQL · Kafka · Docker · Python ML &nbsp;·&nbsp;
+  <span style="color:var(--red);">Données actualisées en continu</span>
+</footer>
+<script>
+// ── UTILS ──────────────────────────────────────────────────
+const fmt = n => {
+  if (n === null || n === undefined || n === '—' || isNaN(n)) return '—';
+  const num = parseFloat(n);
+  if (num >= 1_000_000) return (num/1_000_000).toFixed(1) + 'M';
+  if (num >= 1_000)     return (num/1_000).toFixed(1) + 'K';
+  return num.toFixed(0);
+};
+const fmtPct = n => (parseFloat(n)||0).toFixed(1);
+const COLORS = ['#E8002D','#F5C518','#4FA3FF','#2ECC71','#FF6B6B','#A78BFA','#FB923C','#34D399'];
+const GRID_COLOR = 'rgba(255,255,255,0.04)';
+const FONT = { family: 'IBM Plex Mono', size: 11, color: '#6B6560' };
+Chart.defaults.color = '#6B6560';
+Chart.defaults.font.family = 'IBM Plex Mono';
+Chart.defaults.font.size = 11;
+function reveal(canvasId, loadingId) {
+  document.getElementById(loadingId).style.display = 'none';
+  document.getElementById(canvasId).style.display = 'block';
+}
+// ── CLOCK ──────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('fr-FR', {hour12:false});
+  document.getElementById('date-display').textContent =
+    now.toLocaleDateString('fr-FR', {day:'2-digit', month:'short', year:'numeric'});
+}
+setInterval(updateClock, 1000); updateClock();
+// ── KPIs ───────────────────────────────────────────────────
+async function loadKPIs() {
+  try {
+    const r = await fetch('/api/kpis');
+    const d = await r.json();
+    document.getElementById('kpi-ca').textContent = fmt(d.ca_total);
+    document.getElementById('kpi-profit').textContent = fmt(d.profit_total);
+    document.getElementById('kpi-marge').textContent = fmtPct(d.marge_moyenne_pct);
+    document.getElementById('kpi-tx').textContent = fmt(d.total_transactions);
+    if (d.date_debut && d.date_fin)
+      document.getElementById('kpi-period').textContent = d.date_debut + ' → ' + d.date_fin;
+  } catch(e) { console.warn('KPIs non disponibles') }
+}
+// DQ score moyen depuis le log
+async function loadDQKpi() {
+  try {
+    const r = await fetch('/api/dq_history');
+    const rows = await r.json();
+    if (rows.length) {
+      const avg = rows.reduce((a,b) => a + parseFloat(b.dq_score||0), 0) / rows.length;
+      document.getElementById('kpi-dq').textContent = avg.toFixed(0);
+    }
+  } catch(e) {}
+}
+// ── ÉVOLUTION MENSUELLE ────────────────────────────────────
+async function loadEvolution() {
+  try {
+    const r = await fetch('/api/evolution_mensuelle');
+    const data = await r.json();
+    if (!data.length) { document.getElementById('loading-evo').innerHTML = '<span style="color:var(--muted)">Aucune donnée</span>'; return; }
+    // Pivot data
+    const months = [...new Set(data.map(d => d.mois))].sort();
+    const regions = [...new Set(data.map(d => d.region))];
+    const pivot = {};
+    data.forEach(d => {
+      if (!pivot[d.region]) pivot[d.region] = {};
+      pivot[d.region][d.mois] = parseFloat(d.ca);
+    });
+    const datasets = regions.map((reg, i) => ({
+      label: reg,
+      data: months.map(m => pivot[reg]?.[m] || 0),
+      borderColor: COLORS[i % COLORS.length],
+      backgroundColor: COLORS[i % COLORS.length] + '18',
+      borderWidth: 2,
+      tension: 0.4,
+      fill: true,
+      pointRadius: 3,
+      pointHoverRadius: 6,
+    }));
+    reveal('chart-evo', 'loading-evo');
+    new Chart(document.getElementById('chart-evo'), {
+      type: 'line',
+      data: { labels: months, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#6B6560', boxWidth: 12, font: {size:10} } },
+          tooltip: { mode: 'index', intersect: false,
+            backgroundColor: '#181818', borderColor: '#2a2a2a', borderWidth: 1,
+            titleFont: {family:'Bebas Neue', size:14}, bodyFont: {family:'IBM Plex Mono', size:11},
+          }
+        },
+        scales: {
+          x: { grid: {color: GRID_COLOR}, ticks: {maxRotation:45, font:{size:10}} },
+          y: { grid: {color: GRID_COLOR}, ticks: {callback: v => '$' + fmt(v)} }
+        }
+      }
+    });
+  } catch(e) { console.warn('Evolution error', e); }
+}
+// ── DONUT RÉGIONS ──────────────────────────────────────────
+async function loadDonut() {
+  try {
+    const r = await fetch('/api/ventes_par_region');
+    const data = await r.json();
+    if (!data.length) return;
+    reveal('chart-donut', 'loading-donut');
+    new Chart(document.getElementById('chart-donut'), {
+      type: 'doughnut',
+      data: {
+        labels: data.map(d => d.region),
+        datasets: [{
+          data: data.map(d => parseFloat(d.ca)),
+          backgroundColor: COLORS.slice(0, data.length),
+          borderColor: '#111',
+          borderWidth: 3,
+          hoverOffset: 8,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        cutout: '65%',
+        plugins: {
+          legend: { position: 'right', labels: { color: '#6B6560', boxWidth: 12, font:{size:10}, padding:12 } },
+          tooltip: {
+            backgroundColor: '#181818', borderColor: '#2a2a2a', borderWidth: 1,
+            callbacks: { label: ctx => ` ${ctx.label}: $${fmt(ctx.parsed)}` }
+          }
+        }
+      }
+    });
+    // Region bars
+    const max = Math.max(...data.map(d => parseFloat(d.ca)));
+    const barColors = ['','green','gold','blue','','green'];
+    document.getElementById('region-bars').innerHTML = data.map((d, i) => `
+      <div class="region-item">
+        <div class="region-meta">
+          <span class="region-name">${d.region}</span>
+          <span class="region-val">$${fmt(d.ca)}</span>
+        </div>
+        <div class="region-bar-track">
+          <div class="region-bar-fill ${barColors[i]||''}" style="width:${(parseFloat(d.ca)/max*100).toFixed(1)}%"></div>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { console.warn('Donut error', e); }
+}
+// ── TOP PRODUITS ───────────────────────────────────────────
+async function loadProduits() {
+  try {
+    const r = await fetch('/api/top_produits');
+    const data = await r.json();
+    if (!data.length) return;
+    reveal('chart-produits', 'loading-produits');
+    new Chart(document.getElementById('chart-produits'), {
+      type: 'bar',
+      data: {
+        labels: data.map(d => d.product.length > 18 ? d.product.slice(0,18)+'…' : d.product),
+        datasets: [{
+          label: 'CA ($)',
+          data: data.map(d => parseFloat(d.ca)),
+          backgroundColor: data.map((_, i) => COLORS[i % COLORS.length] + 'CC'),
+          borderColor: data.map((_, i) => COLORS[i % COLORS.length]),
+          borderWidth: 1, borderRadius: 4,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: {display:false},
+          tooltip: { backgroundColor:'#181818', borderColor:'#2a2a2a', borderWidth:1,
+            callbacks: { label: ctx => ` $${fmt(ctx.parsed.x)}` }
+          }
+        },
+        scales: {
+          x: { grid:{color:GRID_COLOR}, ticks:{callback:v=>'$'+fmt(v)} },
+          y: { grid:{display:false}, ticks:{font:{size:10}} }
+        }
+      }
+    });
+  } catch(e) { console.warn('Produits error', e); }
+}
+// ── MARGE PAR RÉGION ───────────────────────────────────────
+async function loadMarge() {
+  try {
+    const r = await fetch('/api/marge_par_region');
+    const data = await r.json();
+    if (!data.length) return;
+    reveal('chart-marge', 'loading-marge');
+    new Chart(document.getElementById('chart-marge'), {
+      type: 'bar',
+      data: {
+        labels: data.map(d => d.region),
+        datasets: [{
+          label: 'Marge (%)',
+          data: data.map(d => parseFloat(d.marge_pct)),
+          backgroundColor: '#2ECC7188',
+          borderColor: '#2ECC71',
+          borderWidth: 1, borderRadius: 4,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend:{display:false},
+          tooltip: {backgroundColor:'#181818', borderColor:'#2a2a2a', borderWidth:1,
+            callbacks:{label:ctx=>` ${fmtPct(ctx.parsed.y)}%`}
+          }
+        },
+        scales: {
+          x: { grid:{display:false} },
+          y: { grid:{color:GRID_COLOR}, ticks:{callback:v=>v+'%'} }
+        }
+      }
+    });
+  } catch(e) { console.warn('Marge error', e); }
+}
+// ── FORECASTS ──────────────────────────────────────────────
+async function loadForecasts() {
+  try {
+    const r = await fetch('/api/forecasts');
+    const data = await r.json();
+    const container = document.getElementById('forecast-container');
+    if (!data.length) {
+      container.innerHTML = '<div class="loading" style="height:120px"><span style="color:var(--muted)">Modèle ML en cours de calcul...</span></div>';
+      return;
+    }
+    container.innerHTML = `
+      <div class="forecast-grid">
+        <div class="forecast-row header">
+          <span>Région</span><span>M+1</span><span>M+2</span><span>M+3</span>
+        </div>
+        ${data.map(d => `
+          <div class="forecast-row">
+            <span style="color:var(--text);font-weight:600;">${d.region}</span>
+            <span class="fc-val">$${fmt(d.forecast_m1)}</span>
+            <span class="fc-val">$${fmt(d.forecast_m2)}</span>
+            <span class="fc-val">$${fmt(d.forecast_m3)}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } catch(e) { console.warn('Forecast error', e); }
+}
+// ── DQ LOG ─────────────────────────────────────────────────
+async function loadDQLog() {
+  try {
+    const r = await fetch('/api/dq_history');
+    const data = await r.json();
+    const tbody = document.getElementById('dq-body');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted)">Aucun log disponible</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(d => `
+      <tr>
+        <td style="color:var(--red)">${d.batch_id}</td>
+        <td>${String(d.checked_at).slice(0,19)}</td>
+        <td style="color:${parseFloat(d.dq_score)>=80?'var(--green)':'var(--red)'}">${parseFloat(d.dq_score).toFixed(1)}</td>
+        <td>${d.total_rows}</td>
+        <td><span class="pill-${d.status?.toLowerCase()==='passed'?'passed':'blocked'}">${d.status}</span></td>
+      </tr>
+    `).join('');
+  } catch(e) { console.warn('DQ log error', e); }
+}
+// ── INIT ───────────────────────────────────────────────────
+async function init() {
+  await Promise.all([
+    loadKPIs(), loadDQKpi(),
+    loadEvolution(), loadDonut(),
+    loadProduits(), loadMarge(),
+    loadForecasts(), loadDQLog(),
+  ]);
+}
+init();
+// Auto-refresh toutes les 60s
+setInterval(init, 60000);
+</script>
+</body>
+</html>
+

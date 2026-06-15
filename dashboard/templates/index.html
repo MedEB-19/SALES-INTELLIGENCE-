@@ -1,0 +1,160 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coca-Cola — Data Platform Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ====== TON CSS ORIGINAL (inchangé) ====== */
+/* (tu peux garder ton CSS tel quel ici) */
+</style>
+<body>
+<!-- LOADING -->
+<div id="loading-overlay">
+  <div class="loader-logo">COCA-COLA</div>
+  <div class="loader-bar"><div class="loader-fill"></div></div>
+  <div class="loader-text">CHARGEMENT...</div>
+</div>
+<!-- HEADER -->
+<header>
+  <div class="logo-area">
+    <div class="logo-badge">CC</div>
+    <div>
+      <div class="logo-text">COCA-COLA DATA PLATFORM</div>
+      <div class="logo-sub">DASHBOARD ANALYTICS</div>
+    </div>
+  </div>
+</header>
+<main>
+<!-- KPI -->
+<div class="section-title">VUE GLOBALE</div>
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div class="kpi-label">CA Global</div>
+    <div class="kpi-value" id="kpi-ca">—</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Volume</div>
+    <div class="kpi-value" id="kpi-volume">—</div>
+  </div>
+</div>
+<!-- CHARTS -->
+<div class="charts-grid">
+  <div class="chart-card">
+    <div class="chart-title">Ventes</div>
+    <canvas id="chart-ca-region"></canvas>
+  </div>
+</div>
+<!-- =============================== -->
+<!-- 🔥 SEGMENTATION K-MEANS -->
+<!-- =============================== -->
+<div class="section-title">SEGMENTATION (K-MEANS)</div>
+<div class="charts-grid">
+  <div class="chart-card">
+    <div class="chart-title">Répartition des segments</div>
+    <canvas id="chart-segments"></canvas>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">CA moyen par segment</div>
+    <canvas id="chart-segment-performance"></canvas>
+  </div>
+</div>
+</main>
+<script>
+let chartInstances = {};
+// =======================
+// FETCH SEGMENTS
+// =======================
+async function fetchJSON(url) {
+  const res = await fetch(url);
+  return res.json();
+}
+// =======================
+// LOAD DATA
+// =======================
+async function loadAll() {
+  const [kpis, monthly, segments] = await Promise.all([
+    fetchJSON('/api/kpis'),
+    fetchJSON('/api/ca-region-mois'),
+    fetchJSON('/api/segments')
+  ]);
+  renderKPIs(kpis);
+  renderMonthly(monthly);
+  renderSegments(segments);
+  document.getElementById('loading-overlay').style.display = 'none';
+}
+// =======================
+// KPIs
+// =======================
+function renderKPIs(d) {
+  document.getElementById("kpi-ca").textContent = d.ca_global;
+  document.getElementById("kpi-volume").textContent = d.volume_total;
+}
+// =======================
+// MONTHLY CHART
+// =======================
+function renderMonthly(data) {
+  const ctx = document.getElementById("chart-ca-region");
+  if (chartInstances.monthly) chartInstances.monthly.destroy();
+  chartInstances.monthly = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: data.map(x => x.mois),
+      datasets: [{
+        label: "CA",
+        data: data.map(x => x.ca_total),
+        borderColor: "red"
+      }]
+    }
+  });
+}
+// =======================
+// 🔥 K-MEANS SEGMENTS
+// =======================
+function renderSegments(data) {
+  const counts = {};
+  const perf = {};
+  data.forEach(d => {
+    const seg = d.segment;
+    counts[seg] = (counts[seg] || 0) + 1;
+    if (!perf[seg]) perf[seg] = { ca: 0, count: 0 };
+    perf[seg].ca += parseFloat(d.chiffre_affaires || 0);
+    perf[seg].count++;
+  });
+  const labels = Object.keys(counts);
+  // ===== DONUT =====
+  const ctx1 = document.getElementById("chart-segments");
+  if (chartInstances.segments) chartInstances.segments.destroy();
+  chartInstances.segments = new Chart(ctx1, {
+    type: "doughnut",
+    data: {
+      labels,
+      datasets: [{
+        data: labels.map(l => counts[l]),
+        backgroundColor: ["#E61C24","#F0A500","#2ECC6E"]
+      }]
+    }
+  });
+  // ===== BAR =====
+  const ctx2 = document.getElementById("chart-segment-performance");
+  if (chartInstances.segmentPerf) chartInstances.segmentPerf.destroy();
+  chartInstances.segmentPerf = new Chart(ctx2, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        label: "CA moyen",
+        data: labels.map(l => perf[l].ca / perf[l].count),
+        backgroundColor: "#E61C24"
+      }]
+    }
+  });
+}
+// =======================
+loadAll();
+</script>
+</body>
+</html>

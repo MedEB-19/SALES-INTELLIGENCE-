@@ -1,0 +1,22 @@
+FROM python:3.11-slim
+
+# ── Java (obligatoire pour PySpark) ──────────────────────────────────────────
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        default-jre-headless \
+        procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Variable JAVA_HOME pour PySpark ──────────────────────────────────────────
+ENV JAVA_HOME=/usr/lib/jvm/default-java
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
+
+# ── Dépendances Python ────────────────────────────────────────────────────────
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# ── Code du job ───────────────────────────────────────────────────────────────
+COPY spark_job.py .
+
+CMD ["python", "spark_job.py"]

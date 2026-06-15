@@ -1,0 +1,23 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install flake8 pandas kafka-python psycopg2-binary scikit-learn sqlalchemy pymongo flask
+      - name: Lint
+        run: flake8 producer/ quality/ processing/ dashboard/ --max-line-length=120 --ignore=E501,W503
+      - name: Build Docker images
+        run: docker compose build
