@@ -466,7 +466,30 @@
       </div>
     </div>
   </div>
-  <!-- Row 3 : ML Forecasts + DQ Log -->
+  <!-- Row 3 : SEGMENTATION K-MEANS -->
+  <div class="grid-2 fade-in" style="animation-delay:.3s;">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">SEGMENTATION K-MEANS</div>
+        <div class="card-badge badge-red">RETAILERS</div>
+      </div>
+      <div class="chart-wrap tall">
+        <div class="loading" id="loading-segments"><div class="spin"></div>Chargement...</div>
+        <canvas id="chart-segments" style="display:none;"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">CA MOYEN PAR SEGMENT</div>
+        <div class="card-badge badge-gold">PERFORMANCE</div>
+      </div>
+      <div class="chart-wrap tall">
+        <div class="loading" id="loading-segment-performance"><div class="spin"></div>Chargement...</div>
+        <canvas id="chart-segment-performance" style="display:none;"></canvas>
+      </div>
+    </div>
+  </div>
+  <!-- Row 4 : ML Forecasts + DQ Log -->
   <div class="grid-2 fade-in" style="animation-delay:.3s;">
     <div class="card">
       <div class="card-header">
@@ -721,6 +744,67 @@ async function loadMarge() {
     });
   } catch(e) { console.warn('Marge error', e); }
 }
+// ── SEGMENTS K-MEANS ───────────────────────────────────────
+async function loadSegments() {
+  try {
+    const r = await fetch('/api/segments');
+    const data = await r.json();
+    if (!data.length) {
+      document.getElementById('loading-segments').innerHTML = '<span style="color:var(--muted)">Aucune segmentation disponible</span>';
+      document.getElementById('loading-segment-performance').innerHTML = '<span style="color:var(--muted)">Aucune segmentation disponible</span>';
+      return;
+    }
+    const counts = {};
+    const totals = {};
+    data.forEach(d => {
+      const label = d.segment_label || `Segment ${d.segment}`;
+      counts[label] = (counts[label] || 0) + 1;
+      totals[label] = (totals[label] || 0) + parseFloat(d.ca_total || 0);
+    });
+    const labels = Object.keys(counts);
+    reveal('chart-segments', 'loading-segments');
+    new Chart(document.getElementById('chart-segments'), {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{
+          data: labels.map(l => counts[l]),
+          backgroundColor: ['#E61C24','#F0A500','#2ECC6E','#4FA3FF']
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right', labels: { color: '#6B6560', boxWidth: 12, font:{size:10} } },
+          tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed} retailers` } }
+        }
+      }
+    });
+    reveal('chart-segment-performance', 'loading-segment-performance');
+    new Chart(document.getElementById('chart-segment-performance'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'CA moyen',
+          data: labels.map(l => Math.round((totals[l] || 0) / counts[l] || 0)),
+          backgroundColor: '#E61C24',
+          borderColor: '#E61C24',
+          borderWidth: 1,
+          borderRadius: 4,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend:{display:false}, tooltip:{ callbacks:{label:ctx => ` $${fmt(ctx.parsed.y)}` } } },
+        scales: {
+          x: { grid:{display:false} },
+          y: { grid:{color:GRID_COLOR}, ticks:{callback:v=>'$'+fmt(v)} }
+        }
+      }
+    });
+  } catch(e) { console.warn('Segments error', e); }
+}
 // ── FORECASTS ──────────────────────────────────────────────
 async function loadForecasts() {
   try {
@@ -775,7 +859,7 @@ async function init() {
     loadKPIs(), loadDQKpi(),
     loadEvolution(), loadDonut(),
     loadProduits(), loadMarge(),
-    loadForecasts(), loadDQLog(),
+    loadSegments(), loadForecasts(), loadDQLog(),
   ]);
 }
 init();

@@ -1,16 +1,26 @@
 
 import os, logging
 from flask import Flask, jsonify, render_template
+from pymongo import MongoClient
 from sqlalchemy import create_engine, text
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__, template_folder="templates")
 POSTGRES_DSN = os.getenv("POSTGRES_DSN", "postgresql://datauser:datapass123@postgres:5432/coca_dwh")
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://datauser:datapass123@mongodb:27017/coca_ml?authSource=admin")
 engine = None
+mongo_client = None
 def get_engine():
     global engine
     if engine is None:
         engine = create_engine(POSTGRES_DSN)
     return engine
+
+def get_mongo_client():
+    global mongo_client
+    if mongo_client is None:
+        mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+    return mongo_client
+
 def query(sql):
     try:
         with get_engine().connect() as conn:
@@ -66,6 +76,28 @@ def api_dq_history():
 def api_forecasts():
     rows = query("SELECT region, rmse, forecast_m1, forecast_m2, forecast_m3 FROM ml_forecasts ORDER BY region")
     return jsonify([{k: float(v) if isinstance(v, (int, float)) else str(v) for k, v in r.items()} for r in rows])
+
+@app.route("/api/ca-region-mois")
+def api_ca_region_mois():
+    rows = query("""
+        SELECT mois, SUM(total_ca) AS ca_total
+        FROM vw_ventes_region_mois
+        GROUP BY mois
+        ORDER BY mois
+    """)
+    return jsonify([{k: float(v) if isinstance(v, (int, float)) else str(v) for k, v in r.items()} for r in rows])
+
+@app.route("/api/segments")
+def api_segments():
+    try:
+        mongo = get_mongo_client()
+        db = mongo.get_default_database()
+        rows = list(db["segments_retailers"].find({}, {"_id": 0}))
+        return jsonify([{k: float(v) if isinstance(v, (int, float)) else v for k, v in r.items()} for r in rows])
+    except Exception as e:
+        logging.error(f"Mongo error: {e}")
+        return jsonify([])
+
 @app.route("/api/marge_par_region")
 def api_marge_par_region():
     rows = query("""

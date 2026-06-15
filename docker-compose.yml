@@ -177,10 +177,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      mongodb:
+        condition: service_started
     ports:
       - "5000:5000"
     environment:
       POSTGRES_DSN: postgresql://datauser:datapass123@postgres:5432/coca_dwh
+      MONGO_URI: mongodb://datauser:datapass123@mongodb:27017/coca_ml?authSource=admin
       FLASK_ENV: production
     networks: [datanet]
     restart: always
