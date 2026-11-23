@@ -228,7 +228,5 @@ vw_kpis_globaux         -- KPIs synthétiques
 
 ---
 
-## 👤 Auteur : Med El Baghdadi
+## 👤 Auteur : Mohamed El Baghdadi
 
-Projet réalisé dans le cadre d'une formation Data Engineering & IA.
-Architecture inspirée des meilleures pratiques cloud-native (AWS, Kafka, Delta Lake, MLflow).
